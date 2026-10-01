@@ -1,0 +1,131 @@
+requests
+beautifulsoup4
+
+#! python3
+# scraper.py - Mini projeto de Web Scraping sobre o jogo Amor Doce.
+# Segue o modelo da aula: requests baixa a página, BeautifulSoup extrai
+# os dados e o programa gera um site (index.html) com o resultado.
+#
+# Uso:
+#   python scraper.py            -> tenta raspar a URL abaixo
+#   python scraper.py --offline  -> usa só os dados de exemplo
+
+import sys
+import html
+
+# ATENÇÃO: troque pela página de personagens que você escolheu raspar
+# e ajuste SELETOR_NOME / SELETOR_DESC olhando o código-fonte dela.
+URL = 'https://amordoce.fandom.com/pt-br/wiki/Personagens'
+SELETOR_NOME = 'h3'
+SELETOR_DESC = 'p'
+
+# Dados de exemplo, usados se a raspagem falhar ou no modo --offline
+EXEMPLO = [
+    ('Castiel', 'O rebelde da escola, guitarrista e dono de um gênio difícil.'),
+    ('Lysandre', 'Calmo e misterioso, adora música e poesia.'),
+    ('Nathaniel', 'Delegado de turma, organizado e muito responsável.'),
+    ('Kentin', 'Chega à escola como um novato tímido e muda com o tempo.'),
+    ('Alexy', 'Divertido e animado, é um dos melhores amigos da protagonista.'),
+    ('Armin', 'Fã de videogames e de piadas, sempre com um sorriso.'),
+    ('Rosalya', 'Estilosa e leal, ajuda a protagonista nas horas difíceis.'),
+    ('Iris', 'Gentil e sonhadora, gosta de ler e de ouvir os amigos.'),
+]
+
+
+def baixar_pagina(url):
+    import requests
+    res = requests.get(url, headers={'User-Agent': 'Mozilla/5.0 (projeto-faculdade)'}, timeout=15)
+    res.raise_for_status()  # para o programa se o download deu errado
+    return res.text
+
+
+def extrair_personagens(texto_html):
+    import bs4
+    sopa = bs4.BeautifulSoup(texto_html, 'html.parser')
+    personagens = []
+    for titulo in sopa.select(SELETOR_NOME):
+        nome = titulo.get_text(strip=True)
+        paragrafo = titulo.find_next(SELETOR_DESC)
+        desc = paragrafo.get_text(strip=True) if paragrafo else ''
+        if nome and desc:
+            personagens.append((nome, desc))
+    return personagens
+
+
+def gerar_site(personagens, fonte):
+    cards = ''
+    for nome, desc in personagens:
+        cards += '<article class="card"><h3>%s</h3><p>%s</p></article>\n' % (
+            html.escape(nome), html.escape(desc))
+    with open('modelo.html', encoding='utf-8') as f:
+        modelo = f.read()
+    pagina = modelo.replace('{{CARDS}}', cards).replace('{{FONTE}}', html.escape(fonte))
+    with open('index.html', 'w', encoding='utf-8') as f:
+        f.write(pagina)
+    print('index.html gerado com %d personagens.' % len(personagens))
+
+
+if __name__ == '__main__':
+    personagens, fonte = EXEMPLO, 'dados de exemplo escritos à mão'
+    if '--offline' not in sys.argv:
+        try:
+            raspados = extrair_personagens(baixar_pagina(URL))
+            if raspados:
+                personagens, fonte = raspados[:12], URL
+            else:
+                print('Nada encontrado com os seletores. Usando dados de exemplo.')
+        except Exception as exc:
+            print('Houve um problema: %s' % exc)
+            print('Usando dados de exemplo.')
+    gerar_site(personagens, fonte)
+
+
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Amor Doce – Guia de Personagens</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Fredoka:wght@500;700&family=Nunito:wght@400;600&display=swap">
+<style>
+:root{--bg:#fff4f7;--tx:#3b1f33;--rosa:#e8537f;--lilas:#efe3ff;--card:#fff;--borda:#f2c9d6;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media(prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#241322;--tx:#fbe9f1;--lilas:#3a2352;--card:#321a30;--borda:#5a2f55}}
+:root[data-theme="dark"]{--bg:#241322;--tx:#fbe9f1;--lilas:#3a2352;--card:#321a30;--borda:#5a2f55}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--tx);font:400 1.05rem/1.6 Nunito,system-ui,sans-serif}
+header{background:var(--lilas);padding:3.5rem 1.2rem 3rem;text-align:center;border-bottom:4px dotted var(--rosa)}
+h1,h2,h3{font-family:Fredoka,system-ui,sans-serif;margin:0}
+h1{font-size:clamp(2.6rem,9vw,4.8rem);color:var(--rosa);font-weight:700;line-height:1.05}
+header p{max-width:34rem;margin:1rem auto 0}
+main{max-width:62rem;margin:0 auto;padding:2rem 1.2rem 3rem}
+h2{font-size:1.8rem;margin:2rem 0 1rem}
+.passos{padding-left:1.2rem;max-width:40rem}
+.grade{display:grid;grid-template-columns:repeat(auto-fill,minmax(15rem,1fr));gap:1rem}
+.card{background:var(--card);border:2px solid var(--borda);border-radius:18px 18px 18px 4px;padding:1rem 1.2rem}
+.card h3{color:var(--rosa);font-size:1.3rem}
+.card p{margin:.4rem 0 0}
+footer{text-align:center;padding:1.5rem 1rem 2rem;font-size:.9rem;opacity:.8}
+a{color:var(--rosa)}
+a:focus-visible{outline:3px solid var(--rosa);outline-offset:2px}
+</style>
+</head>
+<body>
+<header>
+<h1>Amor Doce</h1>
+<p>Guia dos personagens do jogo de romance e escola, feito como projeto de Web Scraping da disciplina Linguagem de Programação II.</p>
+</header>
+<main>
+<h2>Personagens</h2>
+<div class="grade">
+{{CARDS}}
+</div>
+<h2>Como este site foi feito</h2>
+<ol class="passos">
+<li>O <code>requests</code> baixa a página da internet.</li>
+<li>O <code>BeautifulSoup</code> procura os nomes e as descrições no HTML.</li>
+<li>O script <code>scraper.py</code> coloca tudo neste modelo e salva o <code>index.html</code>.</li>
+</ol>
+</main>
+<footer>Fonte dos dados: {{FONTE}}. Projeto acadêmico sem fins comerciais. Amor Doce pertence à Beemoov.</footer>
+</body>
+</html>
